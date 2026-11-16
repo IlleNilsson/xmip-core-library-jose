@@ -1,25 +1,47 @@
 # Its own workspace root, so this repository builds on its own.
-#
-# Every module repository carries this and the template did not, which stopped
-# mattering the moment the template stopped sitting beside the estate: nested at
-# template/rust, cargo walked up, found the root workspace and refused to build.
-#
-# It would have bitten a generated repository the same way. A template that does
-# not obey the estate's rules produces repositories that start out breaking
-# them — doc/governance/rust-style.md section 4.
 [workspace]
 
 [package]
-name = "xmip-template-rust"
+name = "xmip-core-library-jose"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/IlleNilsson/xmip-template-rust"
-description = "Starter template for a Rust Xmip module repository."
+repository = "https://github.com/IlleNilsson/xmip-core-library-jose"
+description = "JOSE, one copy: base64url as JOSE writes it, the JSON Web Signature (RFC 7515) read compact or flattened and signed, the JSON Web Token (RFC 7519) and its registered claims, and the JSON Web Key (RFC 7517) a signature is verified with."
 publish = false
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+# The estate's encoding primitives: base64url, which every JOSE part is
+# written in, SHA-256 for a key's thumbprint, and the HMAC an HS256 key
+# checks a signature with, in constant time.
+codec = { package = "xmip-core-library-codec", git = "https://github.com/IlleNilsson/xmip-core-library-codec", branch = "main" }
+# A header, a claims set, a JWK and a flattened JWS are JSON, read as every
+# JSON reader in the estate reads it; serde for the reader that refuses a
+# member named twice.
+serde = "1"
+serde_json = "1"
+# RS256 and ES256, the crypto xmip-core-library-tls already builds (rustls's
+# default provider); its assembler comes prebuilt, so a Windows build needs
+# no NASM. 1.18 parses an RSA key from its modulus and exponent, and is
+# the oldest any lock in the estate holds.
+aws-lc-rs = { version = "1.18", features = ["prebuilt-nasm"], optional = true }
+# The estate's one certificate reader: the P-256 point a public key's PEM
+# holds (`tls::certificate::point_of`).
+tls = { package = "xmip-core-library-tls", git = "https://github.com/IlleNilsson/xmip-core-library-tls", branch = "main", optional = true }
+
+[features]
+# The keys a signature is verified with and a JWK describes (`jwk`). Off
+# unless a crate asks for it, so a reader of a token's claims — the first
+# gate — never builds a signature verifier.
+key = ["dep:aws-lc-rs", "dep:tls"]
+
+[dev-dependencies]
+# The crate tests its own keys: a dev-dependency on itself is how Cargo
+# turns a feature on for the tests and for nothing else.
+xmip-core-library-jose = { path = ".", features = ["key"] }
 
 [lints.rust]
 # forbid, not deny: a module has no business writing unsafe. The one exception
